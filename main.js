@@ -4,5 +4,5 @@
 
 
    document.body.style = `background-color: ${colorPallete.background}; padding: 0; margin: 0;`;
-
+   alert("THIS IS AN ALERT");
 });
