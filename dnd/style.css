@@ -3,3 +3,9 @@
     margin: 0;
 }
 
+.title {
+    font-size: 36px;
+    color: white;
+    margin-bottom: 20px;
+    padding: 8px;
+}
