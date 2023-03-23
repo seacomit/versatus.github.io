@@ -5,7 +5,7 @@ let selectedEffect = null;
 let rCount = 1;
 let sCount = 0;
 let uCount = 0;
-let rUCount = 1;
+let rUCount = 0;
 let sUCount = 0;
 let uUCount = 0;
 
