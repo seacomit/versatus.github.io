@@ -9,3 +9,29 @@
     margin-bottom: 20px;
     padding: 8px;
 }
+
+.mainContainer {
+    padding-left: 8px;
+}
+
+.basicContainer {
+    margin-bottom: 16px;
+    background-color: #5e60ce;
+    padding: 8px;
+    border-radius: 8px;
+    max-width: 600px;
+}
+
+.whiteLabel {
+    font-size: 20px;
+    color: white;
+    margin-right: 8px;
+}
+
+.smallInput {
+    font-size: 20px;
+    width: 50px;
+    height: 25px;
+    border-radius: 8px;
+    margin-right: 8px;
+}
