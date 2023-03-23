@@ -28,6 +28,13 @@
     margin-right: 8px;
 }
 
+.headerLabel {
+    font-size: 20px;
+    color: white;
+    margin-right: 8px;
+    margin-bottom: 8px;
+}
+
 .smallInput {
     font-size: 20px;
     width: 50px;
@@ -35,3 +42,13 @@
     border-radius: 8px;
     margin-right: 8px;
 }
+
+.smallSelect {
+    font-size: 20px;
+    height: 25px;
+    border-radius: 8px;
+    margin-right: 8px;
+    margin-bottom: 8px;
+}
+
+
