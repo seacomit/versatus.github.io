@@ -13,6 +13,8 @@ let effectAmountMultiplier = 1;
 let isPositive = true;
 let elToFocus = "levelInput";
 
+let addedEffects = [];
+
 class AbilityCounts {
    constructor(r,s,u, rU, sU, uU) {
       this.r = r;
@@ -21,6 +23,23 @@ class AbilityCounts {
       this.rU = rU;
       this.sU = sU;
       this.uU = uU;
+   }
+}
+
+class EffectInstance {
+   constructor(effect, multiplier, isPositive) {
+      this.effect = effect;
+      this.multiplier = multiplier;
+      this.isPositive = isPositive;
+   }
+   
+   getEffectPower() {
+      let value = (this.effect.effectPowerInc * this.multiplier)
+      if (this.effect.effectPowerMod) {
+         value += this.effect.effectPowerMod;
+      }
+      if (!this.isPositive) value *= -1;
+      return value;
    }
 }
 
@@ -48,8 +67,8 @@ function generateEffectTypesList() {
    const effectTypes = [];
    
    // Damage and Heal Effects
-   effectTypes.push(new EffectType("Damage", 0.5, 0.5));
-   effectTypes.push(new EffectType("Heal", 0.5, 0.5));
+   effectTypes.push(new EffectType("Damage", 1, 1));
+   effectTypes.push(new EffectType("Heal", 1, 1));
    
    // Hit and Armor Effects
    effectTypes.push(new EffectType("+Hit", 1, 4.5, false, -0.5));
@@ -383,11 +402,79 @@ function renderAbilityCreatorContainer() {
    });
    tradeoffLabel.appendChild(tradeOffInput);
    
+   // Effect power value
+   // Add button!
+   let effectPowerDelta = 0;
+   if (selectedEffect) {
+      effectPowerDelta = (selectedEffect.effectPowerInc * effectAmountMultiplier);
+      if (selectedEffect.effectPowerMod) effectPowerDelta += selectedEffect.effectPowerMod;
+      if (!isPositive) effectPowerDelta *= -1;
+   }
+   const addEffectButton = document.createElement("button");
+   addEffectButton.id = "addEffectButton";
+   addEffectButton.classList.add("buttonStyle");
+   addEffectButton.textContent = `Add Effect ${effectPowerDelta}`;
+   abilityCreationContainer.appendChild(addEffectButton);
+   addEffectButton.addEventListener("click", () => {
+      if (selectedEffect) {
+         const effectInstance = new EffectInstance(selectedEffect, effectAmountMultiplier, isPositive);
+         addedEffects.push(effectInstance);
+         elToFocus = addEffectButton.id;
+         renderFn();
+      }
+   });
+   
    return abilityCreationContainer;
 }
 
 function renderAddedEffectsContainer() {
+   const effectsContainer = document.createElement("div");
+
+   const emptyLabel = document.createElement("div");
+   emptyLabel.classList.add("headerLabel");
+   emptyLabel.innerText = "No effects added, add some effects!"
+
+   if (addedEffects.length == 0) {
+      effectsContainer.appendChild(emptyLabel);
+      effectsContainer.classList.add("effectsEmptyContainer");
+   } else {
+      let effectPowerDelta = 0;
+      addedEffects.forEach((addedEffect, index) => {
+         const effectPill = document.createElement("span");
+         effectPill.classList.add("effectPill");
+         if (addedEffect.isPositive) {
+            effectPill.classList.add("positiveEffect");
+         } else {
+            effectPill.classList.add("negativeEffect");
+         }
+         effectPill.innerText = addedEffect.getEffectPower() + " " + addedEffect.effect.toString();
+         effectsContainer.appendChild(effectPill);
+         effectPowerDelta += addedEffect.getEffectPower();
+         
+         const removeEffectButton = document.createElement("span");
+         removeEffectButton.classList.add("removeEffectPill");
+         removeEffectButton.innerText = "X";
+         effectPill.appendChild(removeEffectButton);
+         removeEffectButton.addEventListener("click", () => {
+            addedEffects.splice(index, 1);
+            renderFn();
+         });
+      });
+      let totalPoolMinusDelta = effectPowerPool - effectPowerDelta;
+      if (totalPoolMinusDelta < 0) {
+         effectsContainer.classList.add("effectsNegativeContainer");
+      } else {
+         effectsContainer.classList.add("basicContainer");
+      }
+      effectsContainer.classList.add("flexContainer");
+      
+      const remainingEffectPowerLabel = document.createElement("div");
+      remainingEffectPowerLabel.classList.add("whiteLabel");
+      remainingEffectPowerLabel.innerText = `Power used: ${effectPowerDelta} | Power allowed: ${effectPowerPool}`;
+      effectsContainer.appendChild(remainingEffectPowerLabel);
+   }
    
+   return effectsContainer;
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -402,7 +489,8 @@ document.addEventListener("DOMContentLoaded", () => {
       mainContainerEl.innerText = "";
       mainContainerEl.appendChild(renderLevelEntryContainer());
       mainContainerEl.appendChild(renderAbilityTypeSelectionContainer());
-      mainContainerEl.appendChild(renderAbilityCreatorContainer());   
+      mainContainerEl.appendChild(renderAbilityCreatorContainer());
+      mainContainerEl.appendChild(renderAddedEffectsContainer());
       document.getElementById(elToFocus).focus();
    };
    renderFn();
