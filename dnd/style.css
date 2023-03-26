@@ -113,3 +113,7 @@
     border-width: 1px;
     background-color: #ccc;
 }
+
+.containerFlex {
+    display: flex;
+}

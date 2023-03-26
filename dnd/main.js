@@ -10,10 +10,21 @@ let sUCount = 0;
 let uUCount = 0;
 
 let effectAmountMultiplier = 1;
+let diceAmount = 1;
+let diceSides = 6;
+let diceAdder = 0;
+let effectRounds = 1;
+
 let isPositive = true;
 let elToFocus = "levelInput";
 
 let addedEffects = [];
+
+const EffectValueType = {
+   Dice: "Dice",
+   Rounds: "Rounds",
+   Amount: "Amount",
+}
 
 class AbilityCounts {
    constructor(r,s,u, rU, sU, uU) {
@@ -27,38 +38,66 @@ class AbilityCounts {
 }
 
 class EffectInstance {
-   constructor(effect, multiplier, isPositive) {
+   constructor(effect, multiplier, isPositive, diceAmount, diceSides, diceAdder, effectRounds) {
       this.effect = effect;
       this.multiplier = multiplier;
       this.isPositive = isPositive;
+      this.diceAmount = diceAmount;
+      this.diceSides = diceSides;
+      this.diceAdder = diceAdder;
+      this.effectRounds = effectRounds;
    }
    
    getEffectPower() {
-      let value = (this.effect.effectPowerInc * this.multiplier)
+      let value = 0;
+      if (this.effect.effectValueType == EffectValueType.Dice) {
+         value = (((Number(this.diceAmount) * Number(this.diceSides) / 2) + (Number(this.diceAmount) / 2))
+                 + Number(this.diceAdder)) *
+             this.effect.effectPowerInc;
+      } else {
+         value = (this.effect.effectPowerInc * this.multiplier);
+      }
       if (this.effect.effectPowerMod) {
          value += this.effect.effectPowerMod;
       }
+      value *= this.effectRounds;
       if (!this.isPositive) value *= -1;
+      return value;
+   }
+   
+   toString() {
+      let value = "";
+      if (this.effect.effectValueType == EffectValueType.Dice) {
+         value = `${this.diceAmount}d${this.diceSides} ${this.diceAdder == "0" ? "" : "+" + this.diceAdder} ${this.effect.toString()}`;
+      } else {
+         value = this.getEffectPower() + " " + this.effect.toString();
+      }
+      if (this.effect.effectValueType == EffectValueType.Rounds) {
+         value += ` (${this.multiplier} rounds)`;
+      } else if (this.effect.effectValueType == EffectValueType.Amount) {
+         value += ` (${this.effectRounds} rounds)`;
+      } else {
+         if (this.effectRounds > 1) {
+            value += ` (${this.effectRounds} rounds)`;
+         }
+      }
       return value;
    }
 }
 
 // Defines an effect type, like inflict damage, heal, stun, slow, fly etc. 
 class EffectType {
-   constructor(name, valueInc, effectPowerInc, roundBased, effectPowerMod, id=0) {
+   constructor(effectValueType, name, valueInc, effectPowerInc, effectPowerMod, id=0) {
+      this.effectValueType = effectValueType;
       this.name = name;
       this.valueInc = valueInc;
       this.effectPowerInc = effectPowerInc;
-      this.roundBased = roundBased;
       this.effectPowerMod = effectPowerMod;
       this.id = id;
    }
    
    toString() {
       let nameStr = this.name;
-      if (this.roundBased) {
-         nameStr += ` -- (${this.valueInc} round${this.valueInc > 1 ? 's' : ''})`;
-      }
       return nameStr;
    }
 }
@@ -67,27 +106,32 @@ function generateEffectTypesList() {
    const effectTypes = [];
    
    // Damage and Heal Effects
-   effectTypes.push(new EffectType("Damage", 1, 1));
-   effectTypes.push(new EffectType("Heal", 1, 1));
+   effectTypes.push(new EffectType(EffectValueType.Dice,"Damage", 1, 1));
+   effectTypes.push(new EffectType(EffectValueType.Dice, "+Weapon Damage", 1, 1.5));
+   effectTypes.push(new EffectType(EffectValueType.Dice, "AoE Damage(2x2)", 1,  1.5));
+   effectTypes.push(new EffectType(EffectValueType.Dice, "AoE Damage(3x3)", 1, 2));
+   effectTypes.push(new EffectType(EffectValueType.Dice, "AoE Damage(4x4)", 1, 3));
+   effectTypes.push(new EffectType(EffectValueType.Dice, "AoE Damage(5x5)", 1, 4));
+   effectTypes.push(new EffectType(EffectValueType.Dice, "Heal", 1, 1));
    
    // Hit and Armor Effects
-   effectTypes.push(new EffectType("+Hit", 1, 4.5, false, -0.5));
-   effectTypes.push(new EffectType("+AC", 1, 4.5, false, -0.5));
+   effectTypes.push(new EffectType(EffectValueType.Amount, "+Hit", 1, 4.5, -0.5));
+   effectTypes.push(new EffectType(EffectValueType.Amount, "+AC", 1, 4.5, -0.5));
    
    // Miscellaneous Effects 
-   effectTypes.push(new EffectType("Invisibility", 1, 9, true));
-   effectTypes.push(new EffectType("Flight", 1, 13, true));
-   effectTypes.push(new EffectType("Stun(Unbreakable)", 1, 13, true));
-   effectTypes.push(new EffectType("Stun(Breakable)", 1, 7, true));
-   effectTypes.push(new EffectType("Control", 1, 26, true));
-   effectTypes.push(new EffectType("Confuse", 1, 14, true));
-   effectTypes.push(new EffectType("Move twice", 1, 13, true));
-   effectTypes.push(new EffectType("Move 1 squares", 1, 4, true));
-   effectTypes.push(new EffectType("Pull (n feet)", 1, 13, true));
-   effectTypes.push(new EffectType("Knockback", 1, 7, true));
-   effectTypes.push(new EffectType("Slow (-1ac, -1hit, -1sqr)", 1, 9, true));
-   effectTypes.push(new EffectType("Invulnerability", 1, 26, true));
-   effectTypes.push(new EffectType("Reflect", 1, 13, true));
+   effectTypes.push(new EffectType(EffectValueType.Rounds, "Invisibility", 1, 9));
+   effectTypes.push(new EffectType(EffectValueType.Rounds,"Flight", 1, 13));
+   effectTypes.push(new EffectType(EffectValueType.Rounds,"Stun(Unbreakable)", 1, 13));
+   effectTypes.push(new EffectType(EffectValueType.Rounds,"Stun(Breakable)", 1, 7));
+   effectTypes.push(new EffectType(EffectValueType.Rounds,"Control", 1, 26));
+   effectTypes.push(new EffectType(EffectValueType.Rounds,"Confuse", 1, 14));
+   effectTypes.push(new EffectType(EffectValueType.Rounds,"Move twice", 1, 13));
+   effectTypes.push(new EffectType(EffectValueType.Rounds,"Move 1 squares", 1, 4));
+   effectTypes.push(new EffectType(EffectValueType.Rounds,"Pull (n feet)", 1, 13));
+   effectTypes.push(new EffectType(EffectValueType.Rounds,"Knockback", 1, 7));
+   effectTypes.push(new EffectType(EffectValueType.Rounds,"Slow (-1ac, -1hit, -1sqr)", 1, 9));
+   effectTypes.push(new EffectType(EffectValueType.Rounds,"Invulnerability", 1, 26));
+   effectTypes.push(new EffectType(EffectValueType.Rounds,"Reflect", 1, 13));
    
    // Generate IDs for the effects.
    effectTypes.forEach((effect, index) => {
@@ -207,13 +251,34 @@ function renderLevelEntryContainer() {
    return levelEntryContainer;
 }
 
+function renderInputWithLabel(name, id, value, callback) {
+   const regUpLabel = document.createElement("div");
+   regUpLabel.innerText = name;
+   regUpLabel.classList.add("whiteLabel");
+
+   const regUpInput = document.createElement("input");
+   regUpInput.type = "text";
+   regUpInput.id = id;
+   regUpInput.name = id;
+   regUpInput.classList.add("smallInput");
+   regUpInput.maxLength = 3;
+   regUpInput.addEventListener("input", () => {
+      callback(regUpInput.value);
+      elToFocus = regUpInput.id;
+      renderFn();
+   });
+   regUpInput.value = value;
+   regUpLabel.appendChild(regUpInput);
+   return regUpLabel;
+}
+
 function renderAbilityTypeSelectionContainer() {
    const containerWithHeader = document.createElement("div");
    containerWithHeader.classList.add("basicContainer");
    
    const effectPoolLabel = document.createElement("div");
    effectPoolLabel.classList.add("whiteLabel");
-   effectPoolLabel.innerText = "Available Effect Power: ";
+   effectPoolLabel.innerText = "\nAbility's total available Effect Power: ";
    const effectPoolValueLabel = document.createElement("span");
    effectPowerPool = calculateAbilityEffectPower(new AbilityCounts(rCount, sCount, uCount, rUCount, sUCount, uUCount), playerLevel);
    effectPoolValueLabel.innerText = effectPowerPool;
@@ -221,91 +286,46 @@ function renderAbilityTypeSelectionContainer() {
    
    const abilityTypeLabel = document.createElement("div");
    abilityTypeLabel.classList.add("headerLabel");
-   abilityTypeLabel.innerText = "Select ability pool (How many abilities do you want this one equal to)";
+   abilityTypeLabel.innerText = "Set Ability Type (Increase numbers to create a combined ability)";
    containerWithHeader.appendChild(abilityTypeLabel);
    
    const abilityTypeSelectionContainer = document.createElement("div");
+   const leftContainer = document.createElement("div");
+   const rightContainer = document.createElement("div");
    abilityTypeSelectionContainer.classList.add("containerFlex");
+   abilityTypeSelectionContainer.appendChild(leftContainer);
+   abilityTypeSelectionContainer.appendChild(rightContainer);
    containerWithHeader.appendChild(abilityTypeSelectionContainer);
 
-   const regLabel = document.createElement("div");
-   regLabel.innerText = "Regular: ";
-   regLabel.classList.add("whiteLabel");
-   abilityTypeSelectionContainer.appendChild(regLabel);
-
-   const regInput = document.createElement("input");
-   regInput.type = "text";
-   regInput.id = "regInput";
-   regInput.name = "regInput;"
-   regInput.classList.add("smallInput");
-   regInput.maxLength = 3;
-   regInput.addEventListener("input", () => {
-      rCount = regInput.value;
-      elToFocus = regInput.id;
-      renderFn();
-   });
-   regInput.value = rCount;
-   regLabel.appendChild(regInput);
-
-   const specLabel = document.createElement("div");
-   specLabel.innerText = "Special: ";
-   specLabel.classList.add("whiteLabel");
-   abilityTypeSelectionContainer.appendChild(specLabel);
-
-   const specInput = document.createElement("input");
-   specInput.type = "text";
-   specInput.id = "specInput";
-   specInput.name = "specInput;"
-   specInput.classList.add("smallInput");
-   specInput.maxLength = 3;
-   specInput.addEventListener("input", () => {
-      sCount = specInput.value;
-      elToFocus = specInput.id;
-      renderFn();
-   });
-   specInput.value = sCount;
-   specLabel.appendChild(specInput);
+   leftContainer.appendChild(renderInputWithLabel(
+       "Regular: ", "regInput", rCount, (value) => {
+          rCount = value;
+       }));
+   leftContainer.appendChild(renderInputWithLabel(
+       "Special: ", "specInput", sCount, (value) => {
+          sCount = value;
+       }));
+   leftContainer.appendChild(renderInputWithLabel(
+       "Ultimate: ", "ultInput", uCount, (value) => {
+          uCount = value;
+       }));
    
-   
-   const ultLabel = document.createElement("div");
-   ultLabel.innerText = "Ultimate: ";
-   ultLabel.classList.add("whiteLabel");
-   abilityTypeSelectionContainer.appendChild(ultLabel);
-
-   const ultInput = document.createElement("input");
-   ultInput.type = "text";
-   ultInput.id = "ultInput";
-   ultInput.name = "ultInput;"
-   ultInput.classList.add("smallInput");
-   ultInput.maxLength = 3;
-   ultInput.addEventListener("input", () => {
-      uCount = ultInput.value;
-      elToFocus = ultInput.id;
-      renderFn();
-   });
-   ultInput.value = uCount;
-   ultLabel.appendChild(ultInput);
+   // Upgrades
+   rightContainer.appendChild(renderInputWithLabel(
+       "Regular Upg: ", "regUpInput", rUCount, (value) => {
+          rUCount = value;
+       }));
+   rightContainer.appendChild(renderInputWithLabel(
+       "Special Upg: ", "specUpInput", sUCount, (value) => {
+          sUCount = value;
+       }));
+   rightContainer.appendChild(renderInputWithLabel(
+       "Ultimate Upg: ", "ultUpInput", uUCount, (value) => {
+          uUCount = value;
+       }));
+   // </Upgrades>
    
    containerWithHeader.appendChild(effectPoolLabel);
-   
-   /*
-   const abilityTypeInput = document.createElement("select");
-   abilityTypeInput.classList.add("smallSelect");
-   const regOption = document.createElement("option");
-   regOption.value = "regular";
-   regOption.text = "Regular (1d6 cooldown)";
-   const specOption = document.createElement("option");
-   specOption.value = "special";
-   specOption.text = "Special (1d8 cooldown)";
-   const ultOption = document.createElement("option");
-   ultOption.value = "ultimate";
-   ultOption.text = "Ultimate (Once a day)";
-   abilityTypeInput.appendChild(regOption);
-   abilityTypeInput.appendChild(specOption);
-   abilityTypeInput.appendChild(ultOption);
-   abilityTypeSelectionContainer.appendChild(abilityTypeInput);*/
-
-   
    
    return containerWithHeader;
 }
@@ -358,28 +378,45 @@ function renderAbilityCreatorContainer() {
    effectSelectionRow.appendChild(renderEffectTypeSelection(generateEffectTypesList()));
    abilityCreationContainer.appendChild(effectSelectionRow);
    
-   const multiplierLabel = document.createElement("div");
-   multiplierLabel.classList.add("headerLabel");
-   multiplierLabel.innerText = "Effect amount (Value or Rounds): ";
-   effectSelectionRow.appendChild(multiplierLabel);
+   if (selectedEffect) {
+      if (selectedEffect.effectValueType == EffectValueType.Dice) {
+         effectSelectionRow.appendChild(renderInputWithLabel(
+             "Dice Quantity: ", "diceInput", diceAmount, (value) => {
+                diceAmount = value;
+             }));
+         effectSelectionRow.appendChild(renderInputWithLabel(
+             "Dice Sides: ", "sidesInput", diceSides, (value) => {
+                diceSides = value;
+             }));
+         effectSelectionRow.appendChild(renderInputWithLabel(
+             "+Amount: ", "plusAmountInput", diceAdder, (value) => {
+                diceAdder = value;
+             }));
+         effectSelectionRow.appendChild(renderInputWithLabel(
+             "Rounds(1=Instant,>1=DoT): ", "roundsInput", effectRounds, (value) => {
+                effectRounds = value;
+             }));
+      } else if (selectedEffect.effectValueType == EffectValueType.Rounds) {
+         effectRounds = 1;
+         effectSelectionRow.appendChild(renderInputWithLabel(
+             "Rounds: ", "roundsInput", effectAmountMultiplier, (value) => {
+                effectAmountMultiplier = value;
+             }));
+      } else {
+         effectSelectionRow.appendChild(renderInputWithLabel(
+             "Amount: ", "amountInput", effectAmountMultiplier, (value) => {
+                effectAmountMultiplier = value;
+             }));
+         effectSelectionRow.appendChild(renderInputWithLabel(
+             "Rounds: ", "roundsInput", effectRounds, (value) => {
+                effectRounds = value;
+             }));
+      }
+   }
    
-   const multiplierInput = document.createElement("input");
-   multiplierInput.type = "text";
-   multiplierInput.id = "multiplierInput";
-   multiplierInput.name = "multiplierInput;"
-   multiplierInput.classList.add("smallInput");
-   multiplierInput.maxLength = 3;
-   multiplierInput.addEventListener("input", () => {
-      effectAmountMultiplier = multiplierInput.value;
-      elToFocus = multiplierInput.id;
-      renderFn();
-   });
-   multiplierInput.value = effectAmountMultiplier;
-   multiplierLabel.appendChild(multiplierInput);
-
    const tradeoffLabel = document.createElement("div");
    tradeoffLabel.classList.add("headerLabel");
-   tradeoffLabel.innerText = "Positive or negative effect: ";
+   tradeoffLabel.innerText = "\nPositive or negative effect: ";
    effectSelectionRow.appendChild(tradeoffLabel);
 
    const tradeOffInput = document.createElement("select");
@@ -406,8 +443,16 @@ function renderAbilityCreatorContainer() {
    // Add button!
    let effectPowerDelta = 0;
    if (selectedEffect) {
-      effectPowerDelta = (selectedEffect.effectPowerInc * effectAmountMultiplier);
+      if (selectedEffect.effectValueType == EffectValueType.Dice) {
+         effectPowerDelta =
+             ((((Number(diceAmount) * Number(diceSides) / 2) + (Number(diceAmount) / 2)) 
+                 + Number(diceAdder)) * 
+                 selectedEffect.effectPowerInc);
+      } else {
+         effectPowerDelta = (selectedEffect.effectPowerInc * effectAmountMultiplier);
+      }
       if (selectedEffect.effectPowerMod) effectPowerDelta += selectedEffect.effectPowerMod;
+      effectPowerDelta = effectPowerDelta * effectRounds;
       if (!isPositive) effectPowerDelta *= -1;
    }
    const addEffectButton = document.createElement("button");
@@ -417,7 +462,7 @@ function renderAbilityCreatorContainer() {
    abilityCreationContainer.appendChild(addEffectButton);
    addEffectButton.addEventListener("click", () => {
       if (selectedEffect) {
-         const effectInstance = new EffectInstance(selectedEffect, effectAmountMultiplier, isPositive);
+         const effectInstance = new EffectInstance(selectedEffect, effectAmountMultiplier, isPositive, diceAmount, diceSides, diceAdder, effectRounds);
          addedEffects.push(effectInstance);
          elToFocus = addEffectButton.id;
          renderFn();
@@ -447,7 +492,7 @@ function renderAddedEffectsContainer() {
          } else {
             effectPill.classList.add("negativeEffect");
          }
-         effectPill.innerText = addedEffect.getEffectPower() + " " + addedEffect.effect.toString();
+         effectPill.innerText = addedEffect.toString();
          effectsContainer.appendChild(effectPill);
          effectPowerDelta += addedEffect.getEffectPower();
          
